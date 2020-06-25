@@ -5,9 +5,22 @@
 // For Class: CSE 240 with Prof. Selgrad
 //
 
+//-- Exit Codes
+#define UNKNOWN_LAND_TYPE_EXIT 1
+#define FILE_ERROR_EXIT 2
+
+//-- Defines
+//Defines the number of different land types in this generator. Kinda wanna get rid of this as it's only used in one
+// place in LandNeighborProbabilities but I don't see much use to move it's functionality over to a static constant...
 #define LAND_TYPES 6
+//I wanted my testing probabilities to be much more drastic than the spec (i.e. a city cell should have 80+% of being
+// next to another city instead of 40% in the spec). This flag flips between building my probs for the spec or for me.
+//TODO: Flip to 1
+#define ON_SPEC_PROBS 1
 
 #include <iostream>
+#include <cstring>
+#include "termcolor/termcolor.hpp"
 
 using namespace std;
 
@@ -68,6 +81,7 @@ LandType **generateLand(int width, int height);
 LandType pickLandType();
 LandType generateNeighbor(LandType item);
 void printLand(LandType **land, int width, int height);
+ostream &operator<<(ostream &os, LandType landType);
 
 LandType newFromRuralLand();
 LandType newFromForest();
@@ -76,32 +90,48 @@ LandType newFromWater();
 LandType newFromCity();
 LandType newFromMountain();
 LandType generateProbabilisticLandFromCell(const LandNeighborProbabilities &cellNeighborProbabilities);
+char *concatStrings(char *str1, char *str2);
 
 /**
  * Procedurally generates a land mass grid with random land types in each cell dependent on the types around it.
  * @return Exit code
  */
-int main() {
+int main(int argc, char **argv) {
 	cout << "World Generator!\nGenerates a land mass of specified size with random blocks representing different "
 		 "land types.\n" << endl;
+	
+	if (ON_SPEC_PROBS == 0) {
+		cerr << "Warning! Off spec!!" << endl;
+	}
 	
 	// Seed the rand
 	srand(time(nullptr));
 	
+	
+	//TODO: Pull in these inputs from command line args
+	
 	// Ask the user for the land mass size
 	cout << "Enter the width of the land mass: " << endl;
 	int landWidth;
-	while (!scanIntSafe(landWidth) && landWidth > 0) {
-		cerr << "Invalid input. Make sure to enter a positive integer." << endl;
+	while (!scanIntSafe(landWidth) || landWidth < 0) {
+		cerr << "Invalid input. Make sure to enter a positive integer. Try again." << endl;
 	}
 	
 	cout << "Enter the height of the land area: " << endl;
 	int landHeight;
-	while (!scanIntSafe(landHeight) && landHeight > 0) {
-		cerr << "Invalid input. Make sure to enter a positive integer." << endl;
+	while (!scanIntSafe(landHeight) || landHeight < 0) {
+		cerr << "Invalid input. Make sure to enter a positive integer. Try again." << endl;
 	}
 	
 	LandType **land = generateLand(landWidth, landHeight);
+	
+	printLand(land, landWidth, landHeight);
+	
+	// Clean up
+	for (int y=0; y < landHeight; y++) {
+		delete [] land[y];
+	}
+	delete [] land;
 	
 	return 0;
 }
@@ -109,6 +139,8 @@ int main() {
 /**
  * Scans an input string or the std cin and converts it to an int if possible, will fail gracefully if any chars
  * other than digits are present.
+ * I ported this function over from my assignment 2 code with just the change of making outputVal a pass by reference
+ * parameter, so look there for some more explanation.
  * @param outputVal A reference to the int where the scanned value should be stored.
  * @param inputStr Can be NULL. If provided, input will be scanned from this char array instead of cin.
  * @return Successful or not
@@ -126,10 +158,6 @@ bool scanIntSafe(int &outputVal, char *inputStr) {
 	
 	// Originally I used this sscanf to convert a str to an int, but after doing some reading I decided strtol is the
 	// widely accepted choice for safe conversion.
-	// Update: Okay I reached the end of the assignment doc where it listed "Important Notes" and said we didn't have
-	// to worry about bizarre input like text into an integer field right now which I didn't see until now when I'm
-	// all done. I quite like my implementation now, I'm proud of it, so even if it is overkill for right now oh well
-	// whatever. Put text into my integer fields all you like, see what it does. Who needs scanf.
 	int val = (int) strtol(inputStr, &end, 0);
 	
 	// Check if it succeeded, if the end ptr points to something other than \0, then the conversion didn't go
@@ -240,6 +268,9 @@ LandType generateNeighbor(LandType item) {
 			return newFromCity();
 		case MOUNTAIN:
 			return newFromMountain();
+		default:
+			cerr << "Unknown LandType" << endl;
+			exit(UNKNOWN_LAND_TYPE_EXIT);
 	}
 
 }
@@ -251,58 +282,175 @@ LandType generateNeighbor(LandType item) {
  * @param height Its height
  */
 void printLand(LandType **land, int width, int height) {
-
+	cout << "\nLand output: " << endl;
+	// First perform sanity size check
+	if (width > 50 || height > 50) {
+		// Output is kinda large
+		// Use File IO to put it into some file
+		
+		// Gets the current time to in a string such as "2020-06-25 15:02:40"
+		time_t nowTime = time(nullptr);
+		tm *localTime = localtime(&nowTime);
+		char *timeString = new char[20]; //Length is always 20 as can be seen in the example time str above
+		timeString[19] = '\0';
+		sprintf(timeString, "%04d-%02d-%02d %02d:%02d:%02d", localTime->tm_year + 1900, localTime->tm_mon + 1,
+				localTime->tm_mday, localTime->tm_hour, localTime->tm_min, localTime->tm_sec);
+		
+		char outputFilePrefix[] = "Land Outputs/land_";
+		
+		// Combine the two strings
+		char *outputFilePath = concatStrings(outputFilePrefix, timeString);
+		
+		// Set up the file
+		FILE *outputFile = fopen(outputFilePath, "w");
+		
+		if (outputFile == nullptr) {
+			cerr << "Error opening output file: " << outputFilePath << endl;
+			exit(FILE_ERROR_EXIT);
+		}
+		
+		// Print every LandType to the file
+		for (int y=0; y < height; y++) {
+			for (int x=0; x < width; x++) {
+				fprintf(outputFile, "%c", land[y][x]);
+			}
+			fprintf(outputFile, "\n");
+		}
+		
+		cout << termcolor::italic << "Output the land structure to a file: " << outputFilePath << termcolor::reset << endl;
+		
+		//Close file
+		fclose(outputFile);
+		delete [] outputFilePath;
+		delete [] timeString;
+//		delete [] localTime;
+		
+	} else {
+		//Fits nicely within console, print it out
+		for (int y=0; y < height; y++) {
+			for (int x=0; x < width; x++) {
+				cout << land[y][x];
+//				printf("%c", land[y][x]);
+			}
+			cout << endl;
+//			printf("\n");
+		}
+	}
 }
+
+/**
+ * Handles printing out a LandType as a character and with the correct colors
+ * @param os
+ * @param landType
+ * @return
+ */
+ostream &operator<<(ostream &os, LandType landType) {
+	os << termcolor::white;
+	
+	switch (landType) {
+		case FOREST:
+			os << termcolor::on_green;
+			break;
+		case RURAL:
+			os << termcolor::on_yellow;
+			break;
+		case TOWN:
+			os << termcolor::on_magenta;
+			break;
+		case CITY:
+			os << termcolor::on_red;
+			break;
+		case WATER:
+			os << termcolor::on_blue;
+			break;
+		case MOUNTAIN:
+			os << termcolor::on_grey;
+			break;
+		default:
+//			cerr << "Unknown color for land type" << endl;
+			os << termcolor::bold;
+			break;
+	}
+	
+	os << (char) landType << termcolor::reset;
+	return os;
+}
+
 
 //------------
 /**
  * Each of these methods generates a probabilistic neighbor based on the LandType that the function represents.
- * To be clear, I don't like this implementation because the repetitive nature of each function and the code
- * similarity between them screams to be that I should just have one function that lookups the neighbor probs for
+ * To be clear, I don't like this implementation because of the repetitive nature of each function and the code
+ * similarity between them screams to me that I should just have one function that lookups the neighbor probs for
  * each LandType in some table or map. But alas, these functions are in the assignment spec so here they are.
  * @return The new neighbor.
  */
 LandType newFromRuralLand() {
+#if ON_SPEC_PROBS
 	const static LandNeighborProbabilities neighborProbabilities(40, 25, 15, 10, 0, 10);
-	
+#else
+	const static LandNeighborProbabilities neighborProbabilities(90, 15, 10, 5, 1, 5);
+#endif
 	return generateProbabilisticLandFromCell(neighborProbabilities);
 }
 
 LandType newFromForest() {
+#if ON_SPEC_PROBS
 	const static LandNeighborProbabilities neighborProbabilities(20,40,5,20,0,15);
-	
+#else
+	const static LandNeighborProbabilities neighborProbabilities(20,100,5,20,1,7);
+#endif
 	return generateProbabilisticLandFromCell(neighborProbabilities);
 }
 
 LandType newFromTown() {
+#if ON_SPEC_PROBS
 	const static LandNeighborProbabilities neighborProbabilities(20,5,40,10,20,5);
-	
+#else
+	const static LandNeighborProbabilities neighborProbabilities(15,5,120,8,17,3);
+#endif
 	return generateProbabilisticLandFromCell(neighborProbabilities);
 }
 
 LandType newFromWater() {
+#if ON_SPEC_PROBS
 	const static LandNeighborProbabilities neighborProbabilities(15,20,5,40,10,10);
-	
+#else
+	const static LandNeighborProbabilities neighborProbabilities(15,20,5,70,10,5);
+#endif
 	return generateProbabilisticLandFromCell(neighborProbabilities);
 }
 
 LandType newFromCity() {
+#if ON_SPEC_PROBS
 	const static LandNeighborProbabilities neighborProbabilities(0,15,25,10,40,10);
-	
+#else
+	const static LandNeighborProbabilities neighborProbabilities(1,1,9,5,80,3);
+#endif
 	return generateProbabilisticLandFromCell(neighborProbabilities);
 }
 
 LandType newFromMountain() {
+#if ON_SPEC_PROBS
 	const static LandNeighborProbabilities neighborProbabilities(5,15,5,15,10,50);
-	
+#else
+	const static LandNeighborProbabilities neighborProbabilities(0,10,5,10,7,200);
+#endif
 	return generateProbabilisticLandFromCell(neighborProbabilities);
 }
 //----------
 
 /**
  * Goes through each of the neighbor probabilities for a cell to probabilistically generate a neighbor cell.
- * TODO: Explanation.
- * @param cellNeighborProbabilities
+ * The way it does this is by creating an array of LandTypes where each LandType appears exactly as many times as the
+ * probability for that LandType specified in cellNeighborProbabilities. Then an index is chosen at random from that
+ * array and the LandType at that index is returned.
+ * This preserves the probabilities of picking each LandType as specified in cellNeighborProbabilities as it mimics a
+ * grab bag where a random item is returned and each item has probability of probability/totalProbabilityVolume. This
+ * way also naturally allows for future expansion into more LandTypes as it has no hardcoded knowledge of
+ * specific LandTypes.
+ * @param cellNeighborProbabilities A struct representing the probabilities for this cell to have a neighbor of each
+ * LandType
  * @return A probable neighbor
  */
 LandType generateProbabilisticLandFromCell(const LandNeighborProbabilities &cellNeighborProbabilities) {
@@ -323,6 +471,23 @@ LandType generateProbabilisticLandFromCell(const LandNeighborProbabilities &cell
 	// Generate a random number between 0 and the totalProbabilityVolume and check what land type is at that index in
 	// the array
 	int randIndex = rand() % cellNeighborProbabilities.totalProbabilityVolume();
-	return weightedLandTypes[randIndex];
+	LandType selectedType = weightedLandTypes[randIndex];
+	delete [] weightedLandTypes;
+	return selectedType;
 	
+}
+
+
+/**
+ * Creates a new char[] and copies the two specified strings to it; concat str1 + str2.
+ * @param str1
+ * @param str2
+ * @return A new char[]
+ */
+char *concatStrings(char *str1, char *str2) {
+	char *newString = new char[strlen(str1) + strlen(str2) + 1];
+	strcpy(newString, str1);
+	// Directory entry name goes at the end of the directory path accomplished using pointer math
+	strcpy(newString + strlen(str1), str2);
+	return newString;
 }
