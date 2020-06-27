@@ -7,6 +7,11 @@
           <mappings>
             <mapping deploy="/CSE 240/Assignments/Assignment 3/" local="$PROJECT_DIR$" web="/" />
           </mappings>
+          <excludedPaths>
+            <excludedPath local="true" path="$PROJECT_DIR$/cmake-build-debug-brew-gcc" />
+            <excludedPath local="true" path="$PROJECT_DIR$/cmake-build-debug-general-asu" />
+            <excludedPath local="true" path="$PROJECT_DIR$/cmake-build-relwithdebinfo-general-asu" />
+          </excludedPaths>
         </serverdata>
       </paths>
       <paths name="General ASU (4a2785ed-d2a6-4c90-ab50-38255b190be9)">
