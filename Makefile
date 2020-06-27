@@ -30,7 +30,7 @@ $(BUILD_DIR)/kampmeier_aaron_hw3.o: kampmeier_aaron_hw3.cpp
 
 $(BUILD_DIR)/LandGeneration.o: termcolor/include/termcolor/termcolor.hpp
 $(BUILD_DIR)/LandGeneration.o: kampmeier_aaron_LandGeneration.cpp kampmeier_aaron_LandGeneration.h
-	${CPP} ${CXX_INCLUDES} ${FLAGS} -c LandGeneration.cpp -o $(BUILD_DIR)/LandGeneration.o
+	${CPP} ${CXX_INCLUDES} ${FLAGS} -c kampmeier_aaron_LandGeneration.cpp -o $(BUILD_DIR)/LandGeneration.o
 
 clean:
 	rm -r $(BUILD_DIR)/*

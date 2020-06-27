@@ -185,7 +185,11 @@ void printLand(LandType **land, int width, int height) {
 		FILE *outputFile = fopen(outputFilePath, "w");
 		
 		if (outputFile == nullptr) {
-			cerr << "Error opening output file: " << outputFilePath << endl;
+			cout << termcolor::bold << termcolor::red << "Error opening output file: " << outputFilePath << endl;
+			
+			cout << "Make sure you have a \"Land Outputs\" folder in the current working directory." <<
+			termcolor::reset << endl;
+			
 			exit(FILE_ERROR_EXIT);
 		}
 		
